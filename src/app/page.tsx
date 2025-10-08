@@ -13,7 +13,7 @@ export default function Page() {
       <main className="max-w-6xl mx-auto w-full">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           <div className="md:col-span-4">
-            <div className="mb-4 text-lg font-semibold">녹음</div>
+            <div className="mb-4 text-lg font-semibold">녹음 7</div>
             <RecorderPanel onTranscript={setTranscript} />
           </div>
           <div className="md:col-span-8">
