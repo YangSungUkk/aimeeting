@@ -78,7 +78,11 @@ export default function RecorderPanel({ onTranscript }: RecorderPanelProps) {
       // AssemblyAI Realtime 연결
       const tokenRes = await fetch("/api/assemblyai-token", { method: "POST" });
       const tokenJson = await tokenRes.json();
-      if (!tokenRes.ok || !tokenJson.token) throw new Error(tokenJson.error || "Token failed");
+      if (!tokenRes.ok || !tokenJson.token) {
+        const serverMsg = (tokenJson && tokenJson.error) ? String(tokenJson.error) : "Token failed";
+        setPermissionError(`토큰 발급 실패: ${serverMsg}`);
+        throw new Error(serverMsg);
+      }
 
       const sampleRate = 16000;
       const url = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=${sampleRate}&token=${tokenJson.token}`;
