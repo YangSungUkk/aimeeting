@@ -85,7 +85,7 @@ export default function RecorderPanel({ onTranscript }: RecorderPanelProps) {
       }
 
       const sampleRate = 16000;
-      const url = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=${sampleRate}&token=${tokenJson.token}`;
+      const url = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=${sampleRate}&token=${tokenJson.token}&model=universal`;
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
