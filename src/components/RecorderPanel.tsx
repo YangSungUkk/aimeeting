@@ -16,6 +16,7 @@ export default function RecorderPanel({ onTranscript }: RecorderPanelProps) {
   const startTimeRef = useRef<number | null>(null);
   const timerRef = useRef<number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const wsReadyRef = useRef<boolean>(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
@@ -84,6 +85,14 @@ export default function RecorderPanel({ onTranscript }: RecorderPanelProps) {
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
+      ws.onopen = () => {
+        wsReadyRef.current = true;
+      };
+
+      ws.onclose = () => {
+        wsReadyRef.current = false;
+      };
+
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data as string) as {
@@ -113,6 +122,7 @@ export default function RecorderPanel({ onTranscript }: RecorderPanelProps) {
       const AudioCtxCtor = AC ?? WAC;
       if (!AudioCtxCtor) throw new Error("AudioContext not supported");
       const audioCtx = new AudioCtxCtor({ sampleRate });
+      try { await audioCtx.resume(); } catch {}
       audioContextRef.current = audioCtx;
       const source = audioCtx.createMediaStreamSource(stream);
       mediaStreamSourceRef.current = source;
@@ -121,6 +131,15 @@ export default function RecorderPanel({ onTranscript }: RecorderPanelProps) {
       source.connect(processor);
       processor.connect(audioCtx.destination);
 
+      const toBase64 = (buffer: ArrayBuffer) => {
+        let binary = "";
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) binary += String.fromCharCode(bytes[i]);
+        // btoa is available in browsers
+        return btoa(binary);
+      };
+
       processor.onaudioprocess = (e) => {
         const input = e.inputBuffer.getChannelData(0);
         const pcm16 = new Int16Array(input.length);
@@ -128,8 +147,11 @@ export default function RecorderPanel({ onTranscript }: RecorderPanelProps) {
           const s = Math.max(-1, Math.min(1, input[i]));
           pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
         }
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(pcm16.buffer);
+        if (ws && ws.readyState === WebSocket.OPEN && wsReadyRef.current) {
+          const base64 = toBase64(pcm16.buffer);
+          try {
+            ws.send(JSON.stringify({ audio_data: base64 }));
+          } catch {}
         }
       };
     } catch (err) {
@@ -143,7 +165,9 @@ export default function RecorderPanel({ onTranscript }: RecorderPanelProps) {
           ? "다른 앱이 마이크를 사용 중입니다. 해당 앱을 종료 후 다시 시도하세요."
           : name === "NotSupportedError"
           ? "브라우저가 마이크를 지원하지 않거나 정책상 차단되었습니다. 최신 브라우저/HTTPS를 사용하세요."
-          : "마이크 권한을 허용해 주세요.";
+          : (err as Error)?.message?.includes("Token")
+          ? "실시간 토큰 발급에 실패했습니다. 서버 환경변수를 확인하세요."
+          : "실시간 전송 중 오류가 발생했습니다. 네트워크/브라우저 설정을 확인하세요.";
       setPermissionError(message);
       setStatus("idle");
     }
