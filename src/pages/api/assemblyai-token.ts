@@ -28,7 +28,7 @@ export default async function handler(
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ expires_in: 3600, model: "default" }),
+      body: JSON.stringify({ expires_in: 3600 }),
     });
 
     if (!response.ok) {

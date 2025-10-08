@@ -85,7 +85,8 @@ export default function RecorderPanel({ onTranscript }: RecorderPanelProps) {
       }
 
       const sampleRate = 16000;
-      const url = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=${sampleRate}&model=universal-2&token=${tokenJson.token}`;
+      // v3 스트리밍 URL과 쿼리 파라미터 (문서 참고)
+      const url = `wss://streaming.assemblyai.com/v3/ws?sample_rate=${sampleRate}&encoding=pcm_s16le&token=${tokenJson.token}`;
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
