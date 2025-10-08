@@ -7,6 +7,12 @@ export default async function handler(
   res: NextApiResponse<Data>
 ) {
   if (req.method !== "POST") {
+    // 간단한 진단용: GET /api/assemblyai-token?debug=1 → { token?: undefined, error?: undefined } + 200/500
+    if (req.method === "GET" && req.query?.debug === "1") {
+      const hasEnv = !!process.env.ASSEMBLYAI_API_KEY;
+      // 민감 값은 절대 노출하지 않음
+      return res.status(hasEnv ? 200 : 500).json({ error: hasEnv ? undefined : "Missing ASSEMBLYAI_API_KEY" });
+    }
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
@@ -27,7 +33,7 @@ export default async function handler(
 
     if (!response.ok) {
       const text = await response.text();
-      return res.status(500).json({ error: `Token request failed: ${text}` });
+      return res.status(500).json({ error: `Token request failed (${response.status}): ${text.slice(0, 160)}` });
     }
 
     const json = (await response.json()) as { token: string };
