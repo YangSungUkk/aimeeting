@@ -13,7 +13,7 @@ function renderMarkdown(src: string): string {
   const lines = safe.split(/\r?\n/);
   const htmlLines: string[] = [];
 
-  for (let line of lines) {
+  for (const line of lines) {
     // 수평선
     if (/^\s{0,3}(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
       htmlLines.push("<hr/>");
@@ -53,7 +53,7 @@ function renderMarkdown(src: string): string {
     htmlLines.push(`§P§${line}`);
   }
 
-  let html = htmlLines
+  const html = htmlLines
     .join("\n")
     // 목록 래핑 (<li>들을 <ul>로 감싸기)
     .replace(/(?:^|\n)(<li>[\s\S]*?<\/li>)(?=\n(?!<li>)|$)/g, (m) => `<ul class="list-disc pl-6 space-y-1">${m.replaceAll("\n", "")}</ul>`)

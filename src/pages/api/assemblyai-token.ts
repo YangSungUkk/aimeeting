@@ -32,8 +32,9 @@ export default async function handler(
 
     const json = (await response.json()) as { token: string };
     return res.status(200).json({ token: json.token });
-  } catch (e: any) {
-    return res.status(500).json({ error: e?.message || "Unknown error" });
+  } catch (e) {
+    const message = (e as { message?: string })?.message || "Unknown error";
+    return res.status(500).json({ error: message });
   }
 }
 

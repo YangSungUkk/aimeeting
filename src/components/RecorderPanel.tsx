@@ -24,14 +24,14 @@ export default function RecorderPanel() {
     return hh === "00" ? `${mm}:${ss}` : `${hh}:${mm}:${ss}`;
   };
 
-  const stopTimer = () => {
+  const stopTimer = useCallback(() => {
     if (timerRef.current) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
-  };
+  }, []);
 
-  const startTimer = () => {
+  const startTimer = useCallback(() => {
     stopTimer();
     startTimeRef.current = Date.now() - elapsedMs;
     timerRef.current = window.setInterval(() => {
@@ -39,7 +39,7 @@ export default function RecorderPanel() {
         setElapsedMs(Date.now() - startTimeRef.current);
       }
     }, 200);
-  };
+  }, [elapsedMs, stopTimer]);
 
   const handleStart = useCallback(async () => {
     try {
@@ -91,7 +91,12 @@ export default function RecorderPanel() {
       };
 
       // 마이크 → AudioContext → ScriptProcessor → PCM Int16 → WS 전송
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate });
+      type AudioContextConstructor = new (contextOptions?: AudioContextOptions) => AudioContext;
+      const audioCtxCtor: AudioContextConstructor | undefined =
+        (window as { AudioContext?: AudioContextConstructor }).AudioContext ||
+        (window as { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext;
+      if (!audioCtxCtor) throw new Error("AudioContext not supported");
+      const audioCtx = new audioCtxCtor({ sampleRate });
       audioContextRef.current = audioCtx;
       const source = audioCtx.createMediaStreamSource(stream);
       mediaStreamSourceRef.current = source;
@@ -111,8 +116,8 @@ export default function RecorderPanel() {
           ws.send(pcm16.buffer);
         }
       };
-    } catch (err: any) {
-      const name = err?.name || "";
+    } catch (err) {
+      const name = (err as { name?: string })?.name || "";
       const message =
         name === "NotAllowedError"
           ? "브라우저 권한이 차단되었습니다. 주소창 사이트 설정에서 마이크를 '허용'으로 변경하세요."
@@ -126,7 +131,7 @@ export default function RecorderPanel() {
       setPermissionError(message);
       setStatus("idle");
     }
-  }, []);
+  }, [startTimer]);
 
   const handlePause = useCallback(() => {
     const mediaRecorder = mediaRecorderRef.current;
@@ -136,7 +141,7 @@ export default function RecorderPanel() {
       setStatus("paused");
       stopTimer();
     }
-  }, [status]);
+  }, [status, stopTimer]);
 
   const handleResume = useCallback(() => {
     const mediaRecorder = mediaRecorderRef.current;
@@ -146,7 +151,7 @@ export default function RecorderPanel() {
       setStatus("recording");
       startTimer();
     }
-  }, [status]);
+  }, [status, startTimer]);
 
   const handleStop = useCallback(() => {
     const mediaRecorder = mediaRecorderRef.current;
@@ -163,7 +168,7 @@ export default function RecorderPanel() {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       try { wsRef.current.close(); } catch {}
     }
-  }, []);
+  }, [stopTimer]);
 
   useEffect(() => {
     return () => {
