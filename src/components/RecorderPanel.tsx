@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type RecorderStatus = "idle" | "recording" | "paused" | "stopped";
 
-export default function RecorderPanel() {
+type RecorderPanelProps = {
+  onTranscript?: (text: string) => void;
+};
+
+export default function RecorderPanel({ onTranscript }: RecorderPanelProps) {
   const [status, setStatus] = useState<RecorderStatus>("idle");
   const [elapsedMs, setElapsedMs] = useState<number>(0);
   const [permissionError, setPermissionError] = useState<string>("");
@@ -24,14 +28,14 @@ export default function RecorderPanel() {
     return hh === "00" ? `${mm}:${ss}` : `${hh}:${mm}:${ss}`;
   };
 
-  const stopTimer = useCallback(() => {
+  const stopTimer = () => {
     if (timerRef.current) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
-  }, []);
+  };
 
-  const startTimer = useCallback(() => {
+  const startTimer = () => {
     stopTimer();
     startTimeRef.current = Date.now() - elapsedMs;
     timerRef.current = window.setInterval(() => {
@@ -39,7 +43,7 @@ export default function RecorderPanel() {
         setElapsedMs(Date.now() - startTimeRef.current);
       }
     }, 200);
-  }, [elapsedMs, stopTimer]);
+  };
 
   const handleStart = useCallback(async () => {
     try {
@@ -82,21 +86,33 @@ export default function RecorderPanel() {
 
       ws.onmessage = (event) => {
         try {
-          const msg = JSON.parse(event.data);
-          if (msg.text) setPartialText(msg.text);
-        } catch {}
+          const msg = JSON.parse(event.data as string) as {
+            text?: string;
+            transcript?: string;
+            message_type?: string;
+          };
+          const candidate = msg.text || msg.transcript || "";
+          if (candidate) {
+            setPartialText(candidate);
+            if (onTranscript) onTranscript(candidate);
+          }
+        } catch {
+          // ignore non-JSON frames
+        }
       };
       ws.onerror = () => {
         setPermissionError("실시간 연결 오류가 발생했습니다.");
       };
 
       // 마이크 → AudioContext → ScriptProcessor → PCM Int16 → WS 전송
-      type AudioContextConstructor = new (contextOptions?: AudioContextOptions) => AudioContext;
-      const audioCtxCtor: AudioContextConstructor | undefined =
-        (window as { AudioContext?: AudioContextConstructor }).AudioContext ||
-        (window as { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext;
-      if (!audioCtxCtor) throw new Error("AudioContext not supported");
-      const audioCtx = new audioCtxCtor({ sampleRate });
+      type WindowWithAudio = Window & {
+        AudioContext?: typeof AudioContext;
+        webkitAudioContext?: typeof AudioContext;
+      };
+      const { AudioContext: AC, webkitAudioContext: WAC } = window as unknown as WindowWithAudio;
+      const AudioCtxCtor = AC ?? WAC;
+      if (!AudioCtxCtor) throw new Error("AudioContext not supported");
+      const audioCtx = new AudioCtxCtor({ sampleRate });
       audioContextRef.current = audioCtx;
       const source = audioCtx.createMediaStreamSource(stream);
       mediaStreamSourceRef.current = source;
@@ -186,7 +202,7 @@ export default function RecorderPanel() {
   const isIdle = status === "idle" || status === "stopped";
 
   return (
-    <div className="rounded-xl border border-black/[.08] dark:border-white/[.12] p-4 bg-background/80">
+    <div className="rounded-xl border border-black/[.08] dark:border-white/[.12] p-4 bg-background/80 min-h-[260px]">
       {!((typeof window !== "undefined" ? window.isSecureContext : true) || (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))) && (
         <div className="mb-3 text-xs text-amber-600 bg-amber-100/40 dark:text-amber-300 dark:bg-amber-300/10 px-2 py-2 rounded space-y-2">
           <div>이 페이지는 보안 연결(HTTPS)이 아닙니다. 마이크 권한은 HTTPS 또는 localhost에서만 동작합니다.</div>
